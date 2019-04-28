@@ -46,9 +46,13 @@ def construct_model(args):
     #     new_state_dict[name] = v
     # model.load_state_dict(new_state_dict)
 
-    model = torch.nn.DataParallel(model, device_ids=args.gpu).cuda()
+    if args.gpu[0] < 0:
+        return model
+    else:
+        model = torch.nn.DataParallel(model, device_ids=args.gpu).cuda()
 
-    return model
+
+        return model
 
 def get_parameters(model, config, isdefault=True):
 
@@ -106,9 +110,13 @@ def train_val(model, args):
             batch_size=config.batch_size, shuffle=True,
             num_workers=config.workers, pin_memory=True)
 
-    criterion = nn.MSELoss().cuda()
+    if args.gpu[0] < 0:
+        criterion = nn.MSELoss()
+    else: 
+        criterion = nn.MSELoss().cuda()
 
-    params, multiple = get_parameters(model, config, False)
+    params, multiple = get_parameters(model, config, True)
+    # params, multiple = get_parameters(model, config, False)
 
     optimizer = torch.optim.SGD(params, config.base_lr, momentum=config.momentum,
                                 weight_decay=config.weight_decay)
@@ -131,8 +139,9 @@ def train_val(model, args):
                                                  policy_parameter=config.policy_parameter, multiple=multiple)
             data_time.update(time.time() - end)
 
-            heatmap = heatmap.cuda(async=True)
-            centermap = centermap.cuda(async=True)
+            if args.gpu[0] >= 0:
+                heatmap = heatmap.cuda(async=True)
+                centermap = centermap.cuda(async=True)
 
             input_var = torch.autograd.Variable(input)
             heatmap_var = torch.autograd.Variable(heatmap)
@@ -150,10 +159,11 @@ def train_val(model, args):
 
 
             loss = loss1 + loss2 + loss3 + loss4 + loss5 + loss6
-            losses.update(loss.data[0], input.size(0))
+            #print(input.size(0).item())
+            losses.update(loss.item(), input.size(0))
             for cnt, l in enumerate(
                     [loss1, loss2, loss3, loss4, loss5, loss6]):
-                losses_list[cnt].update(l.data[0], input.size(0))
+                losses_list[cnt].update(l.item(), input.size(0))
 
             optimizer.zero_grad()
             loss.backward()
@@ -175,8 +185,8 @@ def train_val(model, args):
                     print('Loss{0} = {loss1.val:.8f} (ave = {loss1.avg:.8f})\t'
                           .format(cnt + 1, loss1=losses_list[cnt]))
 
-                print time.strftime(
-                '%Y-%m-%d %H:%M:%S -----------------------------------------------------------------------------------------------------------------\n',time.localtime())
+                print(time.strftime(
+                '%Y-%m-%d %H:%M:%S -----------------------------------------------------------------------------------------------------------------\n',time.localtime()))
 
                 batch_time.reset()
                 data_time.reset()
@@ -194,8 +204,9 @@ def train_val(model, args):
 
                 model.eval()
                 for j, (input, heatmap, centermap) in enumerate(val_loader):
-                    heatmap = heatmap.cuda(async=True)
-                    centermap = centermap.cuda(async=True)
+                    if args.cuda[0] >= 0:
+                        heatmap = heatmap.cuda(async=True)
+                        centermap = centermap.cuda(async=True)
 
                     input_var = torch.autograd.Variable(input)
                     heatmap_var = torch.autograd.Variable(heatmap)
@@ -236,9 +247,9 @@ def train_val(model, args):
                             print('Loss{0} = {loss1.val:.8f} (ave = {loss1.avg:.8f})\t'
                                   .format(cnt + 1, loss1=losses_list[cnt]))
 
-                        print time.strftime(
+                        print(time.strftime(
                             '%Y-%m-%d %H:%M:%S -----------------------------------------------------------------------------------------------------------------\n',
-                            time.localtime())
+                            time.localtime()))
                         batch_time.reset()
                         losses.reset()
                         for cnt in range(6):
@@ -253,3 +264,6 @@ if __name__ == '__main__':
     args = parse()
     model = construct_model(args)
     train_val(model, args)
+
+    if args.gpu[0] < 0: 
+        torch.device('cpu')

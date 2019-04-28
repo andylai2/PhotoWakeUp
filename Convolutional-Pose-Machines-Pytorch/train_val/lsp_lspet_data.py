@@ -15,7 +15,8 @@ def read_data_file(root_dir):
         return: image list: train or val images list
     """
     image_arr = np.array(glob.glob(os.path.join(root_dir, 'images/*.jpg')))
-    image_nums_arr = np.array([float(s.rsplit('/')[-1][2:-4]) for s in image_arr])
+    #image_nums_arr = np.array([float(s.rsplit('/')[-1][2:-4]) for s in image_arr]) # unix
+    image_nums_arr = np.array([float(s.rsplit('\\')[-1][2:-4]) for s in image_arr]) # windows
     sorted_image_arr = image_arr[np.argsort(image_nums_arr)]
     return sorted_image_arr.tolist()
 
@@ -60,7 +61,7 @@ def read_mat_file(mode, root_dir, img_list):
     return kpts, centers, scales
 
 
-def guassian_kernel(size_w, size_h, center_x, center_y, sigma):
+def gaussian_kernel(size_w, size_h, center_x, center_y, sigma):
     gridy, gridx = np.mgrid[0:size_h, 0:size_w]
     D2 = (gridx - center_x) ** 2 + (gridy - center_y) ** 2
     return np.exp(-D2 / 2.0 / sigma / sigma)
@@ -99,12 +100,12 @@ class LSP_Data(data.Dataset):
         img, kpt, center = self.transformer(img, kpt, center, scale)
         height, width, _ = img.shape
 
-        heatmap = np.zeros((height / self.stride, width / self.stride, len(kpt) + 1), dtype=np.float32)
+        heatmap = np.zeros((int(height / self.stride), int(width / self.stride), len(kpt) + 1), dtype=np.float32)
         for i in range(len(kpt)):
             # resize from 368 to 46
             x = int(kpt[i][0]) * 1.0 / self.stride
             y = int(kpt[i][1]) * 1.0 / self.stride
-            heat_map = guassian_kernel(size_h=height / self.stride, size_w=width / self.stride, center_x=x, center_y=y, sigma=self.sigma)
+            heat_map = gaussian_kernel(size_h=height / self.stride, size_w=width / self.stride, center_x=x, center_y=y, sigma=self.sigma)
             heat_map[heat_map > 1] = 1
             heat_map[heat_map < 0.0099] = 0
             heatmap[:, :, i + 1] = heat_map
@@ -112,7 +113,7 @@ class LSP_Data(data.Dataset):
         heatmap[:, :, 0] = 1.0 - np.max(heatmap[:, :, 1:], axis=2)  # for background
 
         centermap = np.zeros((height, width, 1), dtype=np.float32)
-        center_map = guassian_kernel(size_h=height, size_w=width, center_x=center[0], center_y=center[1], sigma=3)
+        center_map = gaussian_kernel(size_h=height, size_w=width, center_x=center[0], center_y=center[1], sigma=3)
         center_map[center_map > 1] = 1
         center_map[center_map < 0.0099] = 0
         centermap[:, :, 0] = center_map
