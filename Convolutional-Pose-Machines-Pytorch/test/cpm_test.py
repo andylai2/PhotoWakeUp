@@ -3,6 +3,8 @@ import numpy as np
 import cv2
 import math
 import cpm_model
+import os
+import glob
 
 stride = 8
 sigma = 3.0
@@ -14,11 +16,14 @@ def construct_model(pre_model_path):
     state_dict = torch.load(pre_model_path)['state_dict']
     from collections import OrderedDict
     new_state_dict = OrderedDict()
+    # print(state_dict)
+    print('Populating State Dict')
     for k, v in state_dict.items():
-        name = k[7:]
+        #name = k[7:]
+        name = k
         new_state_dict[name] = v
     model.load_state_dict(new_state_dict)
-    model = torch.nn.DataParallel(model, device_ids=[0]).cuda()
+    #model = torch.nn.DataParallel(model, device_ids=[0]).cuda()
 
     return model
 
@@ -30,12 +35,14 @@ def get_kpts(maps, img_h = 368.0, img_w = 368.0):
     map_6 = maps[0]
 
     kpts = []
+    conf = []
     for m in map_6[1:]:
         h, w = np.unravel_index(m.argmax(), m.shape)
         x = int(w * img_w / m.shape[1])
         y = int(h * img_h / m.shape[0])
         kpts.append([x,y])
-    return kpts
+        conf.append([np.amax(m)])
+    return kpts,conf
 
 
 def draw_paint(img_path, kpts):
@@ -70,14 +77,26 @@ def draw_paint(img_path, kpts):
     cv2.waitKey(0)
     cv2.imwrite('test_example.png', im)
 
-def guassian_kernel(size_w, size_h, center_x, center_y, sigma):
+def gaussian_kernel(size_w, size_h, center_x, center_y, sigma):
     gridy, gridx = np.mgrid[0:size_h, 0:size_w]
     D2 = (gridx - center_x) ** 2 + (gridy - center_y) ** 2
     return np.exp(-D2 / 2.0 / sigma / sigma)
 
+def test_loop(model, img_dir, center):
+    image_arr = image_arr = np.array(glob.glob(os.path.join(img_dir, '*.jpg')))
+    image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.png')))]
+    N = len(image_arr)
+    est_joints = np.zeros((14,3,N)) 
+    for i in range(N):
+        img_path = image_arr[i]
+        est_joints[:,:,i] = test_example(model, img_path, center)
+
+    return est_joints
 
 def test_example(model, img_path, center):
 
+    # Read in all jpg files in image path
+    print('Testing on image:', img_path)
 
     img = np.array(cv2.imread(img_path), dtype=np.float32)
     # h, w, c -> c, h, w
@@ -90,7 +109,7 @@ def test_example(model, img_path, center):
 
     # center-map:368*368*1
     centermap = np.zeros((368, 368, 1), dtype=np.float32)
-    center_map = guassian_kernel(size_h=368, size_w=368, center_x=center[0], center_y=center[1], sigma=3)
+    center_map = gaussian_kernel(size_h=368, size_w=368, center_x=center[0], center_y=center[1], sigma=3)
     center_map[center_map > 1] = 1
     center_map[center_map < 0.0099] = 0
     centermap[:, :, 0] = center_map
@@ -99,24 +118,35 @@ def test_example(model, img_path, center):
     img = torch.unsqueeze(img, 0)
     centermap = torch.unsqueeze(centermap, 0)
 
+    print('Evaluating Model')
+
     model.eval()
     input_var = torch.autograd.Variable(img)
     center_var = torch.autograd.Variable(centermap)
 
+    print('Getting Heatmap')
     # get heatmap
     heat1, heat2, heat3, heat4, heat5, heat6 = model(input_var, center_var)
 
-    kpts = get_kpts(heat6, img_h=368.0, img_w=368.0)
+    print('Getting Keypoints')
+    kpts,conf = get_kpts(heat6, img_h=368.0, img_w=368.0)
+    print(kpts)
+    img_est_joints = np.c_[np.array(kpts),np.array(conf)]
 
-    draw_paint(img_path, kpts)
+    # print('Drawing Image')
 
+    # draw_paint(img_path, kpts)
 
+    return img_est_joints
 
 if __name__ == '__main__':
 
     pre_model_path = '../ckpt/cpm_latest.pth.tar'
-    img_path = '../samples/test_example1.jpg'
+    img_dir = './images'
     center = [184, 184]
 
+    print('Constructing Model')
     model = construct_model(pre_model_path)
-    test_example(model, img_path, center)
+    print('Performing Inference')
+    est_joints = test_loop(model, img_dir, center)
+    np.savez('est_joints.npz',est_joints=est_joints)
