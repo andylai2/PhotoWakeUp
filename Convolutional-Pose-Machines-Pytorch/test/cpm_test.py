@@ -86,7 +86,7 @@ def test_loop(model, img_dir, center):
     image_arr = image_arr = np.array(glob.glob(os.path.join(img_dir, '*.jpg')))
     image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.png')))]
     N = len(image_arr)
-    est_joints = np.zeros((14,3,N)) 
+    est_joints = np.zeros((3,14,N)) 
     for i in range(N):
         img_path = image_arr[i]
         est_joints[:,:,i] = test_example(model, img_path, center)
@@ -131,7 +131,9 @@ def test_example(model, img_path, center):
     print('Getting Keypoints')
     kpts,conf = get_kpts(heat6, img_h=368.0, img_w=368.0)
     print(kpts)
-    img_est_joints = np.c_[np.array(kpts),np.array(conf)]
+    print(np.array(kpts).T.shape)
+    print(np.array(conf).T.shape)
+    img_est_joints = np.r_[np.array(kpts).T,np.array(conf).T]
 
     # print('Drawing Image')
 
