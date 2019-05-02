@@ -63,6 +63,7 @@ def guess_init(model, focal_length, j2d, init_pose):
     """
     cids = np.arange(0, 12)
     # map from LSP to SMPL joints
+    print(j2d)
     j2d_here = j2d[cids]
     smpl_ids = [8, 5, 2, 1, 4, 7, 21, 19, 17, 16, 18, 20]
 
@@ -494,7 +495,7 @@ def main(base_dir,
          n_betas=10,
          flength=5000.,
          pix_thsh=25.,
-         use_neutral=False,
+         use_neutral=True,
          viz=True):
     """Set up paths to image and joint data, saves results.
     :param base_dir: folder containing LSP images and data
@@ -624,7 +625,7 @@ if __name__ == '__main__':
         "up optimization at the expense of possible interpenetration.")
     parser.add_argument(
         '--gender_neutral',
-        default=False,
+        default=True,
         action='store_true',
         help="Using this flag always uses the neutral SMPL model, otherwise "
         "gender specified SMPL models are used.")
