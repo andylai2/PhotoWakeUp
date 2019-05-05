@@ -15,8 +15,8 @@ def read_data_file(root_dir):
         return: image list: train or val images list
     """
     image_arr = np.array(glob.glob(os.path.join(root_dir, 'images/*.jpg')))
-    #image_nums_arr = np.array([float(s.rsplit('/')[-1][2:-4]) for s in image_arr]) # unix
-    image_nums_arr = np.array([float(s.rsplit('\\')[-1][2:-4]) for s in image_arr]) # windows
+    image_nums_arr = np.array([float(s.rsplit('/')[-1][2:-4]) for s in image_arr]) # unix
+    #image_nums_arr = np.array([float(s.rsplit('\\')[-1][2:-4]) for s in image_arr]) # windows
     sorted_image_arr = image_arr[np.argsort(image_nums_arr)]
     return sorted_image_arr.tolist()
 

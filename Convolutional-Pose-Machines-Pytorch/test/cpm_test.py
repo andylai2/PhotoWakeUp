@@ -19,8 +19,8 @@ def construct_model(pre_model_path):
     # print(state_dict)
     print('Populating State Dict')
     for k, v in state_dict.items():
-        #name = k[7:]
-        name = k
+        name = k[7:]
+        #name = k
         new_state_dict[name] = v
     model.load_state_dict(new_state_dict)
     #model = torch.nn.DataParallel(model, device_ids=[0]).cuda()
@@ -45,7 +45,7 @@ def get_kpts(maps, img_h = 368.0, img_w = 368.0):
     return kpts,conf
 
 
-def draw_paint(img_path, kpts):
+def draw_paint(img_path, kpts, output_path='./outputs'):
 
     colors = [[255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0], [85, 255, 0], [0, 255, 0], \
               [0, 255, 85], [0, 255, 170], [0, 255, 255], [0, 170, 255], [0, 85, 255], [0, 0, 255]]
@@ -73,9 +73,11 @@ def draw_paint(img_path, kpts):
         cv2.fillConvexPoly(cur_im, polygon, colors[i])
         im = cv2.addWeighted(im, 0.4, cur_im, 0.6, 0)
 
-    cv2.imshow('test_example', im)
-    cv2.waitKey(0)
-    cv2.imwrite('test_example.png', im)
+    #cv2.imshow('test_example', im)
+    #cv2.waitKey(0)
+    img_name = img_path.split('/')[-1]
+    output_name = os.path.join(output_path, img_name)
+    cv2.imwrite(output_name, im)
 
 def gaussian_kernel(size_w, size_h, center_x, center_y, sigma):
     gridy, gridx = np.mgrid[0:size_h, 0:size_w]
@@ -130,14 +132,11 @@ def test_example(model, img_path, center):
 
     print('Getting Keypoints')
     kpts,conf = get_kpts(heat6, img_h=368.0, img_w=368.0)
-    print(kpts)
-    print(np.array(kpts).T.shape)
-    print(np.array(conf).T.shape)
     img_est_joints = np.r_[np.array(kpts).T,np.array(conf).T]
 
-    # print('Drawing Image')
+    print('Drawing Image')
 
-    # draw_paint(img_path, kpts)
+    draw_paint(img_path, kpts)
 
     return img_est_joints
 
