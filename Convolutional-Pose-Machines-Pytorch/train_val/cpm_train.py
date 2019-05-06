@@ -13,6 +13,7 @@ from utils.utils import Config as Config
 import cpm_model
 import lsp_lspet_data
 import Mytransforms
+import pdb
 
 
 def parse():
@@ -27,8 +28,10 @@ def parse():
                         dest='train_dir', help='the path of train file')
     parser.add_argument('--val_dir', default=None, type=str,
                         dest='val_dir', help='the path of val file')
-    parser.add_argument('--model_name', default='../ckpt/cpm', type=str,
+    parser.add_argument('--model_name', default='../ckpt/cpmv2', type=str,
                         help='model name to save parameters')
+    parser.add_argument('--fine_tune', default=False, action='store_true',
+                        help='set true if fine tuning a pretrained model')
 
     return parser.parse_args()
 
@@ -37,14 +40,15 @@ def construct_model(args):
 
     model = cpm_model.CPM(k=14)
     # load pretrained model
-    # state_dict = torch.load(args.pretrained)['state_dict']
-    # from collections import OrderedDict
-    # new_state_dict = OrderedDict()
-    # for k, v in state_dict.items():
-    #
-    #     name = k[7:]
-    #     new_state_dict[name] = v
-    # model.load_state_dict(new_state_dict)
+    if args.fine_tune:
+        state_dict = torch.load(args.pretrained)['state_dict']
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+    
+            name = k[7:]
+            new_state_dict[name] = v
+        model.load_state_dict(new_state_dict)
 
     if args.gpu[0] < 0:
         return model
@@ -262,6 +266,7 @@ if __name__ == '__main__':
 
     # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     args = parse()
+    pdb.set_trace()
     model = construct_model(args)
     train_val(model, args)
 
