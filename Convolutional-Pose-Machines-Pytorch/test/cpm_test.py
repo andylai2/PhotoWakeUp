@@ -44,6 +44,49 @@ def get_kpts(maps, img_h = 368.0, img_w = 368.0):
         conf.append([np.amax(m)])
     return kpts,conf
 
+def read_and_resize(img_path):
+    img = cv2.imread(img_path)
+    return cv2.resize(img,(368,368),interpolation=cv2.INTER_CUBIC),1
+    h,w,c = img.shape
+    if w == h:
+        if w < 368:
+            img = cv2.resize(img,(368,368),interpolation=cv2.INTER_LINEAR)
+            return img,1.0
+        else:
+            img = cv2.resize(img,(368,368),interpolation=cv2.INTER_AREA)
+            return img,1.0
+    # scale based on the biggest dim
+    else:
+        if w > h:
+            scale = 368 / w
+            hn = int(scale * h)
+            if w < 368:
+                img = cv2.rsize(img,(368,hn),interpolation=cv2.INTER_LINEAR) 
+            else:
+                img = cv2.resize(img,(368,hn),interpolation=cv2.INTER_AREA)
+            return img,scale
+        else:
+            scale = 368 / h
+            wn = int(scale * w)
+            if h < 368:
+                img = cv2.resize(img,(wn,368), interpolation=cv2.INTER_LINEAR)
+            else:
+                img = cv2.resize(img,(wn,368),interpolation=cv2.INTER_AREA)
+            return img,scale
+
+def make_square(img):
+    # reshape the image into a square by adding pixels along the smaller dim
+    h,w,c = img.shape
+    t = img.dtype
+    if not h == w:
+        if h < w:
+            append = np.zeros((w-h,w,c),dtype=t)
+            return np.concatenate((img, append), axis=0)
+        else:
+            append = np.zeros((h,h-w,c),dtype=t)
+            return np.concatenate((img,append),axis=1)
+    else:
+        return img
 
 def draw_paint(img_path, kpts, output_path='./outputs'):
 
@@ -85,8 +128,10 @@ def gaussian_kernel(size_w, size_h, center_x, center_y, sigma):
     return np.exp(-D2 / 2.0 / sigma / sigma)
 
 def test_loop(model, img_dir, center):
-    image_arr = image_arr = np.array(glob.glob(os.path.join(img_dir, '*.jpg')))
-    image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.png')))]
+    #image_arr = image_arr = np.array(glob.glob(os.path.join(img_dir, '*.jpg')))
+    #image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.png')))]
+    #image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.bmp')))]
+    image_arr = np.array(glob.glob(os.path.join(img_dir, 'im0266.bmp')))
     N = len(image_arr)
     est_joints = np.zeros((3,14,N)) 
     for i in range(N):
@@ -100,7 +145,10 @@ def test_example(model, img_path, center):
     # Read in all jpg files in image path
     print('Testing on image:', img_path)
 
+    # img,scale = read_and_resize(img_path)
+    # img = np.array(img, dtype=np.float32)
     img = np.array(cv2.imread(img_path), dtype=np.float32)
+    # img = make_square(img)
     # h, w, c -> c, h, w
     img = torch.from_numpy(img.transpose((2, 0, 1)))
     # normalize
@@ -110,8 +158,12 @@ def test_example(model, img_path, center):
         t.sub_(m).div_(s)
 
     # center-map:368*368*1
-    centermap = np.zeros((368, 368, 1), dtype=np.float32)
-    center_map = gaussian_kernel(size_h=368, size_w=368, center_x=center[0], center_y=center[1], sigma=3)
+    #centermap = np.zeros((368, 368, 1), dtype=np.float32)
+    #center_map = gaussian_kernel(size_h=368, size_w=368, center_x=center[0], center_y=center[1], sigma=3)
+    C,H,W = img.shape
+    center = [round(H/2), round(W/2)]
+    centermap = np.zeros((H,W,1), dtype=np.float32)
+    center_map = gaussian_kernel(size_h=H,size_w=W, center_x=center[0], center_y=center[1], sigma=3)
     center_map[center_map > 1] = 1
     center_map[center_map < 0.0099] = 0
     centermap[:, :, 0] = center_map
