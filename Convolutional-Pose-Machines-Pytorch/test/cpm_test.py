@@ -5,10 +5,20 @@ import math
 import cpm_model
 import os
 import glob
+import argparse
+import pdb
 
 stride = 8
 sigma = 3.0
 
+def parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--img_dir',type=str,dest='img_dir',default='./images')
+    parser.add_argument('--output_dir',type=str,dest='output_dir',default='./outputs')
+    parser.add_argument('--pre_model_path',type=str,dest='pre_model_path',default='../ckpt/cpm_latest.pth.tar')
+    parser.add_argument('--gpu',type=int,dest='gpu',default=None,nargs='+')
+
+    return parser.parse_args()
 
 def construct_model(pre_model_path):
 
@@ -88,7 +98,7 @@ def make_square(img):
     else:
         return img
 
-def draw_paint(img_path, kpts, output_path='./outputs'):
+def draw_paint(img_path, kpts, output_dir='./outputs/masked'):
 
     colors = [[255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0], [85, 255, 0], [0, 255, 0], \
               [0, 255, 85], [0, 255, 170], [0, 255, 255], [0, 170, 255], [0, 85, 255], [0, 0, 255]]
@@ -119,7 +129,7 @@ def draw_paint(img_path, kpts, output_path='./outputs'):
     #cv2.imshow('test_example', im)
     #cv2.waitKey(0)
     img_name = img_path.split('/')[-1]
-    output_name = os.path.join(output_path, img_name)
+    output_name = os.path.join(output_dir, img_name)
     cv2.imwrite(output_name, im)
 
 def gaussian_kernel(size_w, size_h, center_x, center_y, sigma):
@@ -127,20 +137,23 @@ def gaussian_kernel(size_w, size_h, center_x, center_y, sigma):
     D2 = (gridx - center_x) ** 2 + (gridy - center_y) ** 2
     return np.exp(-D2 / 2.0 / sigma / sigma)
 
-def test_loop(model, img_dir, center):
-    #image_arr = image_arr = np.array(glob.glob(os.path.join(img_dir, '*.jpg')))
-    #image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.png')))]
-    #image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.bmp')))]
-    image_arr = np.array(glob.glob(os.path.join(img_dir, 'im0266.bmp')))
+def test_loop(model, img_dir, center, output_dir):
+    image_arr = image_arr = np.array(glob.glob(os.path.join(img_dir, '*.jpg')))
+    image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.png')))]
+    image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.bmp')))]
     N = len(image_arr)
     est_joints = np.zeros((3,14,N)) 
     for i in range(N):
         img_path = image_arr[i]
-        est_joints[:,:,i] = test_example(model, img_path, center)
+        est_joints[:,:,i] = test_example(model, img_path, center, output_dir)
 
     return est_joints
 
-def test_example(model, img_path, center):
+def resize_center(x):
+    y = (x-1)/8+1
+    return int(8*(y-1)+7)
+
+def test_example(model, img_path, center, output_dir):
 
     # Read in all jpg files in image path
     print('Testing on image:', img_path)
@@ -161,9 +174,11 @@ def test_example(model, img_path, center):
     #centermap = np.zeros((368, 368, 1), dtype=np.float32)
     #center_map = gaussian_kernel(size_h=368, size_w=368, center_x=center[0], center_y=center[1], sigma=3)
     C,H,W = img.shape
-    center = [round(H/2), round(W/2)]
-    centermap = np.zeros((H,W,1), dtype=np.float32)
-    center_map = gaussian_kernel(size_h=H,size_w=W, center_x=center[0], center_y=center[1], sigma=3)
+    Hc = resize_center(H)
+    Wc = resize_center(W)
+    center = [round(Hc/2), round(Wc/2)]
+    centermap = np.zeros((Hc,Wc,1), dtype=np.float32)
+    center_map = gaussian_kernel(size_h=Hc,size_w=Wc, center_x=center[0], center_y=center[1], sigma=3)
     center_map[center_map > 1] = 1
     center_map[center_map < 0.0099] = 0
     centermap[:, :, 0] = center_map
@@ -174,7 +189,7 @@ def test_example(model, img_path, center):
 
     print('Evaluating Model')
 
-    model.eval()
+    model.eval().cuda()
     input_var = torch.autograd.Variable(img)
     center_var = torch.autograd.Variable(centermap)
 
@@ -183,23 +198,28 @@ def test_example(model, img_path, center):
     heat1, heat2, heat3, heat4, heat5, heat6 = model(input_var, center_var)
 
     print('Getting Keypoints')
-    kpts,conf = get_kpts(heat6, img_h=368.0, img_w=368.0)
+    kpts,conf = get_kpts(heat6, img_h=H, img_w=W)
     img_est_joints = np.r_[np.array(kpts).T,np.array(conf).T]
 
     print('Drawing Image')
 
-    draw_paint(img_path, kpts)
+    draw_paint(img_path, kpts, output_dir)
 
     return img_est_joints
 
 if __name__ == '__main__':
 
-    pre_model_path = '../ckpt/cpm_latest.pth.tar'
-    img_dir = './images'
+    args = parse()
+    #pre_model_path = '../ckpt/cpmv2_latest.pth.tar'
+    #img_dir = './images/masked/'
+    pre_model_path = args.pre_model_path
+    img_dir = args.img_dir
+    output_dir = args.output_dir
     center = [184, 184]
-
+    #pdb.set_trace()
     print('Constructing Model')
     model = construct_model(pre_model_path)
+    model = torch.nn.DataParallel(model, device_ids=args.gpu).cuda()
     print('Performing Inference')
-    est_joints = test_loop(model, img_dir, center)
+    est_joints = test_loop(model, img_dir, center, output_dir)
     np.savez('est_joints.npz',est_joints=est_joints)
