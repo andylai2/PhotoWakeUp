@@ -41,19 +41,19 @@ for i in range(N):
 #    print(y)
 #    pdb.set_trace()
     black_mask[x,y,:] = img[x,y,:]
-    black_mask_name = 'black_mask_'+img_name
+    black_mask_name = 'mask_black_'+img_name
     plt.imsave(os.path.join(output_dir,black_mask_name),black_mask)
 
     # create white mask
     white_mask = np.ones_like(img)*255
     white_mask[x,y,:] = img[x,y,:]
-    white_mask_name = 'white_mask_'+img_name
+    white_mask_name = 'mask_white_'+img_name
     plt.imsave(os.path.join(output_dir,white_mask_name),white_mask)
 
     # create smooth mask
     smooth_mask = gaussian_filter(img,(7,7,1))
     smooth_mask[x,y,:] = img[x,y,:]
-    smooth_mask_name = 'smooth_mask_'+img_name
+    smooth_mask_name = 'mask_smooth_'+img_name
     plt.imsave(os.path.join(output_dir,smooth_mask_name),smooth_mask)
     
     # save orig images in output folder for references

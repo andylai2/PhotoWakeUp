@@ -138,9 +138,9 @@ def gaussian_kernel(size_w, size_h, center_x, center_y, sigma):
     return np.exp(-D2 / 2.0 / sigma / sigma)
 
 def test_loop(model, img_dir, center, output_dir):
-    image_arr = image_arr = np.array(glob.glob(os.path.join(img_dir, '*.jpg')))
-    image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.png')))]
-    image_arr = np.r_[image_arr, np.array(glob.glob(os.path.join(img_dir, '*.bmp')))]
+    image_arr = image_arr = np.array(sorted(glob.glob(os.path.join(img_dir, '*.jpg'))))
+    image_arr = np.r_[image_arr, np.array(sorted(glob.glob(os.path.join(img_dir, '*.png'))))]
+    image_arr = np.r_[image_arr, np.array(sorted(glob.glob(os.path.join(img_dir, '*.bmp'))))]
     N = len(image_arr)
     est_joints = np.zeros((3,14,N)) 
     for i in range(N):
