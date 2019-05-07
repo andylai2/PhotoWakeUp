@@ -135,6 +135,13 @@ def train_val(model, args):
 
     heat_weight = 46 * 46 * 15 / 1.0
 
+    losstracker1 = []
+
+    losstracker2 = []
+    losstracker3 = []
+    losstracker4 = []
+    losstracker5 = []
+    losstracker6 = []
     while iters < config.max_iter:
 
         for i, (input, heatmap, centermap) in enumerate(train_loader):
@@ -259,14 +266,26 @@ def train_val(model, args):
                         for cnt in range(6):
                             losses_list[cnt].reset()
 
+                        losstracker1.append(loss1)
+                        losstracker2.append(loss2)
+                        losstracker3.append(loss3)
+                        losstracker4.append(loss4)
+                        losstracker5.append(loss5)
+                        losstracker6.append(loss6)
                 model.train()
+
+    np.save('loss1',np.asarray(losstracker1))
+    np.save('loss2',np.asarray(losstracker2))
+    np.save('loss3',np.asarray(losstracker3))
+    np.save('loss4',np.asarray(losstracker4))
+    np.save('loss5',np.asarray(losstracker5))
+    np.save('loss6',np.asarray(losstracker6))
 
 
 if __name__ == '__main__':
 
     # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     args = parse()
-    pdb.set_trace()
     model = construct_model(args)
     train_val(model, args)
 
