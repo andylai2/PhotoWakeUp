@@ -32,6 +32,8 @@ from smpl_webuser.verts import verts_decorated
 from lib.sphere_collisions import SphereCollisions
 from lib.max_mixture_prior import MaxMixtureCompletePrior
 from render_model import render_model
+import pdb
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -486,7 +488,7 @@ def run_single_fit(img,
               'pose': sv.pose.r,
               'betas': sv.betas.r}
 
-    return params, images
+    return params, images, verts
 
 
 def main(base_dir,
@@ -538,16 +540,23 @@ def main(base_dir,
             sph_regs = np.load(SPH_REGS_NEUTRAL_PATH)
 
     # Load joints
+    print('Loading joints')
     est = np.load(join(data_dir, 'est_joints.npz'))['est_joints']
 
     # Load images
-    img_paths = sorted(glob(join(img_dir, '*[0-9].jpg')))
+    #print(img_dir)
+    img_paths = sorted(glob(join(img_dir, '*[0-9].png')))
+    print(img_paths)
     for ind, img_path in enumerate(img_paths):
+        if not ind == 10:
+            continue
         out_path = '%s/%04d.pkl' % (out_dir, ind)
         if not exists(out_path):
             _LOGGER.info('Fitting 3D body on `%s` (saving to `%s`).', img_path,
                          out_path)
+            #print('Reading image %d' % (ind))
             img = cv2.imread(img_path)
+            #print(img.shape)
             if img.ndim == 2:
                 _LOGGER.warn("The image is grayscale!")
                 img = np.dstack((img, img, img))
@@ -566,7 +575,8 @@ def main(base_dir,
                     if use_interpenetration:
                         sph_regs = sph_regs_male
 
-            params, vis = run_single_fit(
+            print('Running single fit')
+            params, vis, verts = run_single_fit(
                 img,
                 joints,
                 conf,
@@ -594,12 +604,19 @@ def main(base_dir,
                         plt.pause(1)
                 raw_input('Press any key to continue...')
 
+            print('Pickling outputs')
             with open(out_path, 'w') as outf:
                 pickle.dump(params, outf)
 
             # This only saves the first rendering.
+
             if do_degrees is not None:
                 cv2.imwrite(out_path.replace('.pkl', '.png'), vis[0])
+
+            # save mesh variables
+            np.save(out_path.replace('.pkl','_v.npy'),verts)
+            
+            
 
 
 if __name__ == '__main__':
